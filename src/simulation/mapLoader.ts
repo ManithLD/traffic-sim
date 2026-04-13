@@ -92,6 +92,12 @@ function isOSMData(data: unknown): data is TorontoOSMData {
     )
 }
 
+function distanceMetres(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const dlat = (lat2 - lat1) * 111000
+    const dlon = (lon2 - lon1) * 111000 * Math.cos(lat1 * Math.PI / 180)
+    return Math.sqrt(dlat * dlat + dlon * dlon)
+}
+
 export function loadRoadNetwork(): RoadNetwork {
     const nodes: MapNode[] = []
     const roads: Road[] = []
@@ -172,4 +178,28 @@ export function loadRoadNetwork(): RoadNetwork {
     const signals = nodes.filter((n) => n.isSignal)
 
     return { nodes, roads, signals }
+}
+
+export function buildAdjacencyList(network: RoadNetwork): Map<string, { signalId: string, roadId: string }[]> {
+    const adjacencyList = new Map<string, { signalId: string, roadId: string }[]>()
+
+    for (const road of network.roads) {
+        const signalsOnRoad: string[] = []
+
+        for (const [lat, lon] of road.coordinates) {
+            for (const signal of network.signals) {
+                const dist = distanceMetres(lat, lon, signal.lat, signal.lon)
+                if (dist < 40 && !signalsOnRoad.includes(signal.id)) {
+                    signalsOnRoad.push(signal.id)
+                }
+            }
+        }
+
+        for (let i = 0; i < signalsOnRoad.length - 1; i++) {
+            adjacencyList.set(signalsOnRoad[i], [...(adjacencyList.get(signalsOnRoad[i]) || []), { signalId: signalsOnRoad[i + 1], roadId: road.id }])
+            adjacencyList.set(signalsOnRoad[i + 1], [...(adjacencyList.get(signalsOnRoad[i + 1]) || []), { signalId: signalsOnRoad[i], roadId: road.id }])
+        }
+    }
+
+    return adjacencyList
 }
