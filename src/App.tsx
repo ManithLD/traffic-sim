@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import { buildAdjacencyList, loadRoadNetwork } from './simulation/mapLoader'
 import RoadNetworkLayer from './components/RoadNetwork'
@@ -10,23 +10,23 @@ function App() {
   const [path, setPath] = useState<PathResult | null>(null);
   const adjacency = useMemo(() => buildAdjacencyList(network), [network])
 
-  const startNewPath = () => {
+  const startNewPath = useCallback(() => {
     const connected = network.signals.filter(s => 
         (adjacency.get(s.id)?.length ?? 0) >= 2
-      )
-      if (connected.length < 2) return
+    )
+    if (connected.length < 2) return
 
-      const startNode = connected[Math.floor(Math.random() * connected.length)]
-      const endNode = connected[Math.floor(Math.random() * connected.length)]
-      if (startNode.id === endNode.id) return
+    const startNode = connected[Math.floor(Math.random() * connected.length)]
+    const endNode = connected[Math.floor(Math.random() * connected.length)]
+    if (startNode.id === endNode.id) return
 
-      const result = dijkstra(adjacency, startNode.id, endNode.id)
-      if (result) setPath(result)
-  }
+    const result = dijkstra(adjacency, startNode.id, endNode.id)
+    if (result) setPath(result)
+  }, [network, adjacency]);
 
   useEffect(() => {
     startNewPath();
-  }, [network, adjacency])
+  }, [startNewPath])
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { RoadNetwork } from "../simulation/mapLoader"
 import { PathResult } from "../simulation/pathFinding"
 import { CircleMarker, useMap } from "react-leaflet"
@@ -40,7 +40,7 @@ export default function VehicleLayer({ network, path, startNewPath }: Props) {
         return map
     }, [network])
 
-    const animate = (timestamp: number): void => {
+    const animate = useCallback((timestamp: number): void => {
         if (!startTimeRef.current) startTimeRef.current = timestamp
 
         const segmentIndex = segmentIndexRef.current
@@ -82,7 +82,7 @@ export default function VehicleLayer({ network, path, startNewPath }: Props) {
         }
 
         animationRef.current = requestAnimationFrame(animate)
-    }
+    }, [pathCoords, roadMap, map, startNewPath, path?.roadIds])
 
     useEffect(() => {
         if (pathCoords.length < 2) return
@@ -103,7 +103,7 @@ export default function VehicleLayer({ network, path, startNewPath }: Props) {
                 cancelAnimationFrame(animationRef.current)
             }
         }
-    }, [pathCoords])
+    }, [animate, pathCoords])
 
     const vehicle = vehicleRef.current
     if (!vehicle) return null
