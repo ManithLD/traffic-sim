@@ -1,61 +1,5 @@
 import torontoData from '../data/toronto.json'
 
-function getImportedData(): unknown {
-    let data = (torontoData as any)?.default ?? torontoData
-
-    while (data && typeof data === 'object' && 'default' in data) {
-        data = (data as any).default
-    }
-
-    if (typeof data === 'string') {
-        try {
-            data = JSON.parse(data)
-        } catch {
-            throw new Error('Failed to parse the imported map data as JSON.')
-        }
-    }
-
-    return data
-}
-
-const rawData = getImportedData()
-
-interface GeoJSONGeometry {
-    type: 'Point' | 'LineString' | string
-    coordinates?: unknown
-}
-
-interface GeoJSONFeature {
-    type: 'Feature'
-    id?: string | number
-    properties?: Record<string, any>
-    geometry?: GeoJSONGeometry
-}
-
-interface TorontoGeoJSON {
-    type: 'FeatureCollection'
-    features: GeoJSONFeature[]
-}
-
-interface OSMNodeElement {
-    type: 'node'
-    id: number
-    lat: number
-    lon: number
-    tags?: Record<string, string>
-}
-
-interface OSMWayElement {
-    type: 'way'
-    id: number
-    nodes: number[]
-    tags?: Record<string, string>
-}
-
-interface TorontoOSMData {
-    elements: (OSMNodeElement | OSMWayElement)[]
-}
-
 export interface MapNode {
     id: string
     lat: number
@@ -67,6 +11,7 @@ export interface Road {
     id: string
     name: string
     coordinates: [number, number][]
+    nodeIds: string[] 
 }
 
 export interface RoadNetwork {
@@ -75,131 +20,144 @@ export interface RoadNetwork {
     signals: MapNode[]
 }
 
-function isGeoJSON(data: unknown): data is TorontoGeoJSON {
-    return (
-        !!data &&
-        typeof data === 'object' &&
-        Array.isArray((data as any).features)
-    )
-}
+const getCoordId = (lat: number, lon: number) => 
+    `node-${lat.toFixed(6)}-${lon.toFixed(6)}`;
 
-
-function isOSMData(data: unknown): data is TorontoOSMData {
-    return (
-        !!data &&
-        typeof data === 'object' &&
-        Array.isArray((data as any).elements)
-    )
-}
-
-function distanceMetres(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const dlat = (lat2 - lat1) * 111000
-    const dlon = (lon2 - lon1) * 111000 * Math.cos(lat1 * Math.PI / 180)
-    return Math.sqrt(dlat * dlat + dlon * dlon)
+function getImportedData(): any {
+    let data = (torontoData as any)?.default ?? torontoData;
+    while (data && typeof data === 'object' && 'default' in data) {
+        data = (data as any).default;
+    }
+    return typeof data === 'string' ? JSON.parse(data) : data;
 }
 
 export function loadRoadNetwork(): RoadNetwork {
-    const nodes: MapNode[] = []
-    const roads: Road[] = []
+    const rawData = getImportedData();
+    const allNodesMap = new Map<string, MapNode>();
+    const roads: Road[] = [];
 
-    if (isGeoJSON(rawData)) {
-        const features = rawData.features
+    if (rawData.type === 'FeatureCollection') {
+        for (const feature of rawData.features) {
+            const { geometry, properties, id: featureId } = feature;
+            if (!geometry) continue;
 
-        for (const feature of features) {
-        const geom = feature.geometry
-        const props = feature.properties
+            // Roads
+            if (geometry.type === 'LineString') {
+                const coords = geometry.coordinates as [number, number][]; // [lon, lat]
+                const nodeIds: string[] = [];
 
-        if (!geom || !geom.type) continue
-
-        // Intersections or Signals
-        if (geom.type === 'Point' && Array.isArray(geom.coordinates)) {
-            const [lon, lat] = geom.coordinates as [number, number]
-            nodes.push({
-                id: feature.id != null ? String(feature.id) : `point-${lat}-${lon}`,
-                lat,
-                lon,
-                isSignal:
-                    props?.highway === 'traffic_signals' ||
-                    props?.traffic_signals === 'signal'
-            })
-        } 
-
-        // Roads
-        else if (geom.type === 'LineString' && Array.isArray(geom.coordinates)) {
-            const coords = (geom.coordinates as [number, number][]).map(
-                ([lon, lat]) => [lat, lon] as [number, number]
-            )
-            roads.push({
-                id: feature.id != null ? String(feature.id) : `road-${roads.length}`,
-                name: props?.name || 'Unknown',
-                coordinates: coords
-            })
-        }
-        }
-    } 
-    
-    else if (isOSMData(rawData)) {
-        const osmNodes = new Map<number, MapNode>()
-
-        // Signals
-        for (const element of rawData.elements) {
-            if (element.type === 'node') {
-                const node: MapNode = {
-                    id: element.id.toString(),
-                    lat: element.lat,
-                    lon: element.lon,
-                    isSignal: element.tags?.highway === 'traffic_signals'
+                for (const [lon, lat] of coords) {
+                    const id = getCoordId(lat, lon);
+                    nodeIds.push(id);
+                    if (!allNodesMap.has(id)) {
+                        allNodesMap.set(id, { id, lat, lon, isSignal: false });
+                    }
                 }
-                nodes.push(node)
-                osmNodes.set(element.id, node)
+
+                roads.push({
+                    id: featureId?.toString() || `road-${roads.length}`,
+                    name: properties?.name || 'Unknown',
+                    coordinates: coords.map(([lon, lat]) => [lat, lon] as [number, number]),
+                    nodeIds
+                });
             }
         }
 
-        // Roads but for OSM data
-        for (const element of rawData.elements) {
-        if (element.type === 'way' && Array.isArray(element.nodes)) {
-            const coords: [number, number][] = element.nodes
-                .map((nodeId) => osmNodes.get(nodeId))
-                .filter((node): node is MapNode => !!node)
-                .map((node) => [node.lat, node.lon])
-            roads.push({
-                id: element.id.toString(),
-                name: element.tags?.name || 'Unknown',
-                coordinates: coords
-            })
-        }
+        // Points
+        for (const feature of rawData.features) {
+            if (feature.geometry?.type === 'Point') {
+                const [lon, lat] = feature.geometry.coordinates;
+                const id = getCoordId(lat, lon);
+                const node = allNodesMap.get(id);
+                if (node) node.isSignal = true;
+            }
         }
     } 
-    
-    else {
-        throw new Error('Unsupported map data format: Expected GeoJSON or OSM elements.')
+
+    else if (rawData.elements) {
+        const osmNodes = new Map<number, MapNode>();
+
+        for (const el of rawData.elements) {
+            if (el.type === 'node') {
+                const id = el.id.toString();
+                const node = {
+                    id,
+                    lat: el.lat,
+                    lon: el.lon,
+                    isSignal: el.tags?.highway === 'traffic_signals'
+                };
+                allNodesMap.set(id, node);
+                osmNodes.set(el.id, node);
+            }
+        }
+
+        for (const el of rawData.elements) {
+            if (el.type === 'way' && el.nodes) {
+                const nodeIds: string[] = [];
+                const coords: [number, number][] = [];
+
+                for (const osmId of el.nodes) {
+                    const node = osmNodes.get(osmId);
+                    if (node) {
+                        nodeIds.push(node.id);
+                        coords.push([node.lat, node.lon]);
+                    }
+                }
+
+                roads.push({
+                    id: el.id.toString(),
+                    name: el.tags?.name || 'Unknown',
+                    coordinates: coords,
+                    nodeIds
+                });
+            }
+        }
     }
 
-    const signals = nodes.filter((n) => n.isSignal)
+    const nodes = Array.from(allNodesMap.values());
+    const signals = nodes.filter(n => n.isSignal);
 
-    return { nodes, roads, signals }
+    return { nodes, roads, signals };
+}
+
+function distanceMetres(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const dlat = (lat2 - lat1) * 111000
+  const dlon = (lon2 - lon1) * 111000 * Math.cos(lat1 * Math.PI / 180)
+  return Math.sqrt(dlat * dlat + dlon * dlon)
 }
 
 export function buildAdjacencyList(network: RoadNetwork): Map<string, { signalId: string, roadId: string }[]> {
-    const adjacencyList = new Map<string, { signalId: string, roadId: string }[]>()
+  const adjacency = new Map<string, { signalId: string, roadId: string }[]>()
 
-    for (const road of network.roads) {
-        const signalsOnRoad: string[] = []
+  for (const road of network.roads) {
+    const signalsOnRoad: string[] = []
 
-        for (const [lat, lon] of road.coordinates) {
-            for (const signal of network.signals) {
-                const dist = distanceMetres(lat, lon, signal.lat, signal.lon)
-                if (dist < 40 && !signalsOnRoad.includes(signal.id)) {
-                    signalsOnRoad.push(signal.id)
-                }
-            }
+    for (const [lat, lon] of road.coordinates) {
+      for (const signal of network.signals) {
+        const dist = distanceMetres(lat, lon, signal.lat, signal.lon)
+        if (dist < 40 && !signalsOnRoad.includes(signal.id)) {
+          signalsOnRoad.push(signal.id)
         }
-
-        for (let i = 0; i < signalsOnRoad.length - 1; i++) {
-            adjacencyList.set(signalsOnRoad[i], [...(adjacencyList.get(signalsOnRoad[i]) || []), { signalId: signalsOnRoad[i + 1], roadId: road.id }])
-            adjacencyList.set(signalsOnRoad[i + 1], [...(adjacencyList.get(signalsOnRoad[i + 1]) || []), { signalId: signalsOnRoad[i], roadId: road.id }])
-        }
+      }
     }
 
-    return adjacencyList
+    for (let i = 0; i < signalsOnRoad.length - 1; i++) {
+      const from = signalsOnRoad[i]
+      const to = signalsOnRoad[i + 1]
+
+      const fromList = adjacency.get(from) || []
+      if (!fromList.some(n => n.signalId === to)) {
+        fromList.push({ signalId: to, roadId: road.id })
+        adjacency.set(from, fromList)
+      }
+
+      const toList = adjacency.get(to) || []
+      if (!toList.some(n => n.signalId === from)) {
+        toList.push({ signalId: from, roadId: road.id })
+        adjacency.set(to, toList)
+      }
+    }
+  }
+
+  return adjacency
 }

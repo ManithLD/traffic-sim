@@ -45,22 +45,23 @@ export function dijkstra(
     }
   }
 
-  if (!prev.has(endId)) return null
+  if (!prev.has(endId)) return null;
 
-  const signalIds: string[] = []
-  const roadIds: string[] = []
-  let current: string | null = endId
+  const signalIds: string[] = [];
+  const roadIds: string[] = [];
+  let current: string | null = endId;
 
   while (current !== null) {
-    signalIds.unshift(current)
-    const p = prev.get(current)
+    signalIds.unshift(current);
+    const p = prev.get(current);
+    
     if (p) {
-      roadIds.unshift(p.roadId)
-      current = p.roadId ? p.signalId : null
+      roadIds.unshift(p.roadId);
+      current = p.signalId; 
     } else {
-      current = null
+      current = null;
     }
   }
 
-  return { signalIds, roadIds }
+  return { signalIds, roadIds };
 }

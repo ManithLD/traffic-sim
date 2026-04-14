@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Polyline, CircleMarker } from 'react-leaflet'
 import { RoadNetwork } from '../simulation/mapLoader'
 import { PathResult } from '../simulation/pathFinding';
@@ -12,8 +12,8 @@ interface Props {
 
 export default function RoadNetworkLayer({ network, path }: Props) {
   const [colorIndex, setColorIndex] = useState(0);
-  const START_ID = "node/21436490"
-  const END_ID = "node/29605052"
+  const startId = path?.signalIds[0] ?? null
+  const endId = path?.signalIds[path.signalIds.length - 1] ?? null
 
   useEffect(() => {
       const timer = setInterval(() => {
@@ -36,14 +36,14 @@ export default function RoadNetworkLayer({ network, path }: Props) {
       ))}
       {network.signals.map((signal) => {
         let signalColor = SIGNAL_COLORS[colorIndex];
-        if (signal.id === START_ID) signalColor = 'blue'
-        if (signal.id === END_ID) signalColor = 'purple'
+        if (signal.id === startId) signalColor = 'blue'
+        if (signal.id === endId) signalColor = 'purple'
         
         return (
           <CircleMarker
           key={`${signal.id}-${colorIndex}`}
           center={[signal.lat, signal.lon]}
-          radius={signal.id === START_ID || signal.id === END_ID ? 10 : 5}
+          radius={signal.id === startId || signal.id === endId ? 10 : 5}
           color={signalColor}
           fillColor={signalColor}
           fillOpacity={1}

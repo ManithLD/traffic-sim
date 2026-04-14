@@ -1,33 +1,32 @@
-import React, { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import { buildAdjacencyList, loadRoadNetwork } from './simulation/mapLoader'
 import RoadNetworkLayer from './components/RoadNetwork'
-import { dijkstra } from './simulation/pathFinding'
+import { dijkstra, PathResult } from './simulation/pathFinding'
 
 function App() {
   const network = useMemo(() => loadRoadNetwork(), [])
+  const [path, setPath] = useState<PathResult | null>(null);
   const adjacency = useMemo(() => buildAdjacencyList(network), [network])
 
-  // check our two test signals
-  console.log('start neighbours:', adjacency.get('node/24959516'))
-  console.log('end neighbours:', adjacency.get('node/29605052'))
-  console.log('connected signals:',
-    network.signals.filter(s => adjacency.get(s.id) !== undefined).map(s => s.id)
-  )
-  const path = useMemo(() => {
-    // try different start signals until we find a connected pair
-    const connected = network.signals.filter(s => adjacency.get(s.id) !== undefined)
-    
-    for (const start of connected) {
-      const result = dijkstra(adjacency, start.id, 'node/29605052')
-      if (result) {
-        console.log('found path from:', start.id, 'steps:', result.signalIds.length)
-        return result
-      }
-    }
-    console.log('no path found')
-    return null
-  }, [adjacency, network])
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // only pick well-connected signals
+      const connected = network.signals.filter(s => 
+        (adjacency.get(s.id)?.length ?? 0) >= 2
+      )
+      if (connected.length < 2) return
+
+      const startNode = connected[Math.floor(Math.random() * connected.length)]
+      const endNode = connected[Math.floor(Math.random() * connected.length)]
+      if (startNode.id === endNode.id) return
+
+      const result = dijkstra(adjacency, startNode.id, endNode.id)
+      if (result) setPath(result)
+    }, 5000)
+  return () => clearInterval(interval)
+}, [network, adjacency])
+
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
       <MapContainer
