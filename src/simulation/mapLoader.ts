@@ -12,6 +12,7 @@ export interface Road {
     name: string
     coordinates: [number, number][]
     nodeIds: string[] 
+    oneWay: boolean
 }
 
 export interface RoadNetwork {
@@ -58,7 +59,8 @@ export function loadRoadNetwork(): RoadNetwork {
                     id: featureId?.toString() || `road-${roads.length}`,
                     name: properties?.name || 'Unknown',
                     coordinates: coords.map(([lon, lat]) => [lat, lon] as [number, number]),
-                    nodeIds
+                    nodeIds,
+                    oneWay: featureId.tags?.oneway === 'yes'
                 });
             }
         }
@@ -108,7 +110,8 @@ export function loadRoadNetwork(): RoadNetwork {
                     id: el.id.toString(),
                     name: el.tags?.name || 'Unknown',
                     coordinates: coords,
-                    nodeIds
+                    nodeIds,
+                    oneWay: el.tags?.oneway === 'yes'
                 });
             }
         }
@@ -159,12 +162,14 @@ export function buildAdjacencyList(network: RoadNetwork) {
             })
 
             // backward
-            if (!adjacency.has(toId)) adjacency.set(toId, [])
+            if (!road.oneWay) {
+                if (!adjacency.has(toId)) adjacency.set(toId, [])
                 adjacency.get(toId)!.push({
                     nodeId: fromId,
                     roadId: road.id,
                     cost
-            })
+                })
+            }
         }
     }
 

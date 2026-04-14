@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Polyline, CircleMarker } from 'react-leaflet'
 import { RoadNetwork } from '../simulation/mapLoader'
 import { PathResult } from '../simulation/pathFinding';
+import { OneWayDecorator } from './OneWayLayer';
 
 const SIGNAL_COLORS = ['red', 'yellow', 'green'];
 
@@ -25,15 +26,23 @@ export default function RoadNetworkLayer({ network, path }: Props) {
 
   return (
     <>
-      {network.roads.map((road, index) => (
-        <Polyline
-          key={`path-${road.id}-${index}`}
-          positions={road.coordinates}
-          color="#555"
-          weight={2}
-          opacity={0.8}
-        />
-      ))}
+      {network.roads.map((road) => {
+        const positions = road.coordinates
+        return (
+          <React.Fragment key={road.id}>
+            <Polyline
+              positions={positions}
+              color={'#555'}
+              weight={2}
+              opacity={0.8}
+            />
+
+            {road.oneWay && (
+              <OneWayDecorator positions={positions} />
+            )}
+          </React.Fragment>
+        )
+      })}
       {network.signals.map((signal) => {
         let signalColor = SIGNAL_COLORS[colorIndex];
         if (signal.id === startId) signalColor = 'blue'
@@ -50,10 +59,10 @@ export default function RoadNetworkLayer({ network, path }: Props) {
         />
       )})}
       {path && (() => {
-        const pathCoords = path.signalIds
-          .map(id => network.signals.find(s => s.id === id))
-          .filter((s): s is NonNullable<typeof s> => s != null)
-          .map(s => [s.lat, s.lon] as [number, number])
+        const pathCoords = path.signalIds 
+          .map(id => network.nodes.find(n => n.id === id))
+          .filter((n): n is NonNullable<typeof n> => n != null)
+          .map(n => [n.lat, n.lon] as [number, number])
 
         if (pathCoords.length < 2) return null
 
