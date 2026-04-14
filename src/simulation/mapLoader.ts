@@ -12,7 +12,8 @@ export interface Road {
     name: string
     coordinates: [number, number][]
     nodeIds: string[] 
-    oneWay: boolean
+    oneWay: boolean,
+    maxSpeed: number
 }
 
 export interface RoadNetwork {
@@ -60,7 +61,8 @@ export function loadRoadNetwork(): RoadNetwork {
                     name: properties?.name || 'Unknown',
                     coordinates: coords.map(([lon, lat]) => [lat, lon] as [number, number]),
                     nodeIds,
-                    oneWay: featureId.tags?.oneway === 'yes'
+                    oneWay: featureId.tags?.oneway === 'yes',
+                    maxSpeed: (featureId.tags?.maxspeed ? parseInt(featureId.tags.maxspeed) : 50) / 3.6 // ms
                 });
             }
         }
@@ -111,7 +113,8 @@ export function loadRoadNetwork(): RoadNetwork {
                     name: el.tags?.name || 'Unknown',
                     coordinates: coords,
                     nodeIds,
-                    oneWay: el.tags?.oneway === 'yes'
+                    oneWay: el.tags?.oneway === 'yes',
+                    maxSpeed: (el.tags?.maxspeed ? parseInt(el.tags.maxspeed) : 50) // divide by 3.6 for ms which we should use later, but keep as is for testing
                 });
             }
         }
