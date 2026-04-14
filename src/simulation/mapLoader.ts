@@ -129,7 +129,7 @@ function distanceMetres(lat1: number, lon1: number, lat2: number, lon2: number):
 export function buildAdjacencyList(network: RoadNetwork) {
     const adjacency = new Map<
         string,
-        { signalId: string; roadId: string; cost: number }[]
+        { nodeId: string; roadId: string; cost: number }[]
     >()
 
     const nodeMap = new Map(network.nodes.map(n => [n.id, n]))
@@ -153,7 +153,7 @@ export function buildAdjacencyList(network: RoadNetwork) {
             // forward
             if (!adjacency.has(fromId)) adjacency.set(fromId, [])
                 adjacency.get(fromId)!.push({
-                    signalId: toId,
+                    nodeId: toId,
                     roadId: road.id,
                     cost
             })
@@ -161,7 +161,7 @@ export function buildAdjacencyList(network: RoadNetwork) {
             // backward
             if (!adjacency.has(toId)) adjacency.set(toId, [])
                 adjacency.get(toId)!.push({
-                    signalId: fromId,
+                    nodeId: fromId,
                     roadId: road.id,
                     cost
             })

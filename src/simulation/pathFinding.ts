@@ -1,17 +1,17 @@
-type Adjacency = Map<string, { signalId: string; roadId: string; cost: number }[]>
+type Adjacency = Map<string, { nodeId: string; roadId: string; cost: number }[]>
 
 export interface PathResult {
   signalIds: string[]
   roadIds: string[]
 }
 
-export function dijkstra(
+export function dijkstra( // add A* later?
   adjacency: Adjacency,
   startId: string,
   endId: string
 ): PathResult | null {
   const dist = new Map<string, number>()
-  const prev = new Map<string, { signalId: string; roadId: string } | null>()
+  const prev = new Map<string, { nodeId: string; roadId: string } | null>()
   const unvisited = new Set<string>()
 
   for (const id of adjacency.keys()) {
@@ -35,12 +35,12 @@ export function dijkstra(
     unvisited.delete(current)
 
     for (const neighbour of adjacency.get(current) ?? []) {
-      if (!unvisited.has(neighbour.signalId)) continue
+      if (!unvisited.has(neighbour.nodeId)) continue
 
       const newDist = (dist.get(current) ?? Infinity) + neighbour.cost
-      if (newDist < (dist.get(neighbour.signalId) ?? Infinity)) {
-        dist.set(neighbour.signalId, newDist)
-        prev.set(neighbour.signalId, { signalId: current, roadId: neighbour.roadId })
+      if (newDist < (dist.get(neighbour.nodeId) ?? Infinity)) {
+        dist.set(neighbour.nodeId, newDist)
+        prev.set(neighbour.nodeId, { nodeId: current, roadId: neighbour.roadId })
       }
     }
   }
@@ -57,7 +57,7 @@ export function dijkstra(
     
     if (p) {
       roadIds.unshift(p.roadId);
-      current = p.signalId; 
+      current = p.nodeId; 
     } else {
       current = null;
     }
