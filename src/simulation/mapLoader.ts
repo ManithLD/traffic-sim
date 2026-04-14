@@ -1,4 +1,4 @@
-import torontoData from '../data/toronto.json'
+import torontoData from '../data/export.json'
 
 export interface MapNode {
     id: string
@@ -121,43 +121,52 @@ export function loadRoadNetwork(): RoadNetwork {
 }
 
 function distanceMetres(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const dlat = (lat2 - lat1) * 111000
-  const dlon = (lon2 - lon1) * 111000 * Math.cos(lat1 * Math.PI / 180)
-  return Math.sqrt(dlat * dlat + dlon * dlon)
+    const dlat = (lat2 - lat1) * 111000
+    const dlon = (lon2 - lon1) * 111000 * Math.cos(lat1 * Math.PI / 180)
+    return Math.sqrt(dlat * dlat + dlon * dlon)
 }
 
-export function buildAdjacencyList(network: RoadNetwork): Map<string, { signalId: string, roadId: string }[]> {
-  const adjacency = new Map<string, { signalId: string, roadId: string }[]>()
+export function buildAdjacencyList(network: RoadNetwork) {
+    const adjacency = new Map<
+        string,
+        { signalId: string; roadId: string; cost: number }[]
+    >()
 
-  for (const road of network.roads) {
-    const signalsOnRoad: string[] = []
+    const nodeMap = new Map(network.nodes.map(n => [n.id, n]))
 
-    for (const [lat, lon] of road.coordinates) {
-      for (const signal of network.signals) {
-        const dist = distanceMetres(lat, lon, signal.lat, signal.lon)
-        if (dist < 40 && !signalsOnRoad.includes(signal.id)) {
-          signalsOnRoad.push(signal.id)
+    for (const road of network.roads) {
+        for (let i = 0; i < road.nodeIds.length - 1; i++) {
+            const fromId = road.nodeIds[i]
+            const toId = road.nodeIds[i + 1]
+
+            const fromNode = nodeMap.get(fromId)
+            const toNode = nodeMap.get(toId)
+            if (!fromNode || !toNode) continue
+
+            const cost = distanceMetres(
+                fromNode.lat,
+                fromNode.lon,
+                toNode.lat,
+                toNode.lon
+            )
+
+            // forward
+            if (!adjacency.has(fromId)) adjacency.set(fromId, [])
+                adjacency.get(fromId)!.push({
+                    signalId: toId,
+                    roadId: road.id,
+                    cost
+            })
+
+            // backward
+            if (!adjacency.has(toId)) adjacency.set(toId, [])
+                adjacency.get(toId)!.push({
+                    signalId: fromId,
+                    roadId: road.id,
+                    cost
+            })
         }
-      }
     }
 
-    for (let i = 0; i < signalsOnRoad.length - 1; i++) {
-      const from = signalsOnRoad[i]
-      const to = signalsOnRoad[i + 1]
-
-      const fromList = adjacency.get(from) || []
-      if (!fromList.some(n => n.signalId === to)) {
-        fromList.push({ signalId: to, roadId: road.id })
-        adjacency.set(from, fromList)
-      }
-
-      const toList = adjacency.get(to) || []
-      if (!toList.some(n => n.signalId === from)) {
-        toList.push({ signalId: from, roadId: road.id })
-        adjacency.set(to, toList)
-      }
-    }
-  }
-
-  return adjacency
+    return adjacency
 }

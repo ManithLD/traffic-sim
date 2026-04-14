@@ -1,4 +1,4 @@
-type Adjacency = Map<string, { signalId: string; roadId: string }[]>
+type Adjacency = Map<string, { signalId: string; roadId: string; cost: number }[]>
 
 export interface PathResult {
   signalIds: string[]
@@ -37,7 +37,7 @@ export function dijkstra(
     for (const neighbour of adjacency.get(current) ?? []) {
       if (!unvisited.has(neighbour.signalId)) continue
 
-      const newDist = (dist.get(current) ?? Infinity) + 1
+      const newDist = (dist.get(current) ?? Infinity) + neighbour.cost
       if (newDist < (dist.get(neighbour.signalId) ?? Infinity)) {
         dist.set(neighbour.signalId, newDist)
         prev.set(neighbour.signalId, { signalId: current, roadId: neighbour.roadId })

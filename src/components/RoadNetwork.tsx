@@ -49,19 +49,24 @@ export default function RoadNetworkLayer({ network, path }: Props) {
           fillOpacity={1}
         />
       )})}
-      {path && path.roadIds.map((roadId: string, index: number) => {
-        const road = network.roads.find(r => r.id === roadId)
-        if (!road) return null
+      {path && (() => {
+        const pathCoords = path.signalIds
+          .map(id => network.signals.find(s => s.id === id))
+          .filter((s): s is NonNullable<typeof s> => s != null)
+          .map(s => [s.lat, s.lon] as [number, number])
+
+        if (pathCoords.length < 2) return null
+
         return (
           <Polyline
-            key={`path-${roadId}-${index }`}
-            positions={road.coordinates}
+            key="path-line"
+            positions={pathCoords}
             color="orange"
             weight={4}
             opacity={1}
           />
         )
-      })}
+      })()}
     </>
   )
 }
