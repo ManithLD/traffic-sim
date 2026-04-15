@@ -4,25 +4,66 @@ import { RoadNetwork } from '../simulation/mapLoader'
 import { PathResult } from '../simulation/pathFinding';
 import { OneWayDecorator } from './OneWayLayer';
 
-const SIGNAL_COLORS = ['red', 'yellow', 'green'];
-
 interface Props {
-  network: RoadNetwork
-  path: PathResult | null
+  network: RoadNetwork,
+  path: PathResult | null,
+  approachingSignalId: string | null,
+  setSignalStates: (id: string, color: string) => void
 }
 
-export default function RoadNetworkLayer({ network, path }: Props) {
-  const [colorIndex, setColorIndex] = useState(0);
-  const startId = path?.signalIds[0] ?? null
-  const endId = path?.signalIds[path.signalIds.length - 1] ?? null
+function SmartTrafficLight({ signal, isApproaching, isStart, isEnd, setSignalStates }: any) {
+  const [color, setColor] = useState<'red' | 'yellow' | 'green'>(() => {
+    const colors: ('red' | 'yellow' | 'green')[] = ['red', 'green'];
+    return colors[Math.floor(Math.random() * colors.length)];
+  });
 
   useEffect(() => {
-      const timer = setInterval(() => {
-        setColorIndex((prevIndex) => (prevIndex + 1) % SIGNAL_COLORS.length);
-      }, 3000);
+    setSignalStates(signal.id, color);
+  }, [color, signal.id, setSignalStates]);
 
-      return () => clearInterval(timer);
-  }, []);
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+
+    if (isApproaching) {
+      if (color === 'red') {
+        setColor('yellow');
+      } else if (color === 'yellow') {
+        timeout = setTimeout(() => setColor('green'), 1000);
+      }
+    } else {
+      const durations = { green: 4000, yellow: 1500, red: 4000 };
+      
+      timeout = setTimeout(() => {
+        setColor(c => {
+            if (c === 'green') return 'yellow';
+            if (c === 'yellow') return 'red';
+            return 'green';
+        });
+      }, durations[color] + (Math.random() * 500));
+    }
+
+    return () => clearTimeout(timeout);
+  }, [color, isApproaching]);
+
+  let displayColor: string = color;
+  if (isStart) displayColor = "blue";
+  if (isEnd) displayColor = "purple";
+
+  return (
+      <CircleMarker
+          key={`${signal.id}-${displayColor}`} 
+          center={[signal.lat, signal.lon]}
+          radius={isStart || isEnd ? 10 : 5}
+          color={displayColor}
+          fillColor={displayColor}
+          fillOpacity={1}
+      />
+  )
+}
+
+export default function RoadNetworkLayer({ network, path, approachingSignalId, setSignalStates }: Props) {
+  const startId = path?.signalIds[0] ?? null
+  const endId = path?.signalIds[path.signalIds.length - 1] ?? null
 
   return (
     <>
@@ -43,21 +84,16 @@ export default function RoadNetworkLayer({ network, path }: Props) {
           </React.Fragment>
         )
       })}
-      {network.signals.map((signal) => {
-        let signalColor = SIGNAL_COLORS[colorIndex];
-        if (signal.id === startId) signalColor = 'blue'
-        if (signal.id === endId) signalColor = 'purple'
-        
-        return (
-          <CircleMarker
-          key={`${signal.id}-${colorIndex}`}
-          center={[signal.lat, signal.lon]}
-          radius={signal.id === startId || signal.id === endId ? 10 : 5}
-          color={signalColor}
-          fillColor={signalColor}
-          fillOpacity={1}
+      {network.signals.map((signal) => (
+        <SmartTrafficLight 
+            key={signal.id} 
+            signal={signal} 
+            isApproaching={approachingSignalId === signal.id}
+            isStart={signal.id === startId}
+            isEnd={signal.id === endId}
+            setSignalStates={setSignalStates}
         />
-      )})}
+      ))}
       {path && (() => {
         const pathCoords = path.signalIds 
           .map(id => network.nodes.find(n => n.id === id))

@@ -6,9 +6,11 @@ import { dijkstra, PathResult } from './simulation/pathFinding'
 import VehicleLayer from './components/VehicleLayer'
 
 function App() {
-  const network = useMemo(() => loadRoadNetwork(), [])
+  const network = useMemo(() => loadRoadNetwork(), []);
   const [path, setPath] = useState<PathResult | null>(null);
-  const adjacency = useMemo(() => buildAdjacencyList(network), [network])
+  const adjacency = useMemo(() => buildAdjacencyList(network), [network]);
+  const [approachingSignalId, setApproachingSignalId] = useState<string | null>(null);
+  const [signalStates, setSignalStates] = useState<Record<string, string>>({});
 
   const startNewPath = useCallback(() => {
     const connected = network.signals.filter(s => 
@@ -28,6 +30,10 @@ function App() {
     startNewPath();
   }, [startNewPath])
 
+  const updateSignalState = useCallback((id: string, color: string) => {
+    setSignalStates(prev => ({ ...prev, [id]: color }));
+  }, []);
+
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
       <MapContainer
@@ -42,8 +48,8 @@ function App() {
           url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
           attribution='© OpenStreetMap contributors © CARTO'
         />
-        <VehicleLayer network={network} path={path} startNewPath={startNewPath} />
-        <RoadNetworkLayer network={network} path={path} />
+        <VehicleLayer network={network} path={path} startNewPath={startNewPath} onApproachSignal={setApproachingSignalId} signalStates={signalStates} />
+        <RoadNetworkLayer network={network} path={path} approachingSignalId={approachingSignalId} setSignalStates={updateSignalState} />
       </MapContainer>
     </div>
   )
