@@ -1,7 +1,6 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer } from 'react-leaflet'
-import { loadRoadNetwork } from './simulation/mapLoader'
-import RoadNetworkLayer from './components/RoadNetwork'
+import RoadNetworkLayer, { RoadNetwork } from './components/RoadNetwork'
 import VehicleLayer from './components/VehicleLayer'
 
 interface VehicleData {
@@ -24,9 +23,16 @@ interface SimSnapshot {
 }
 
 function App() {
-  const network = useMemo(() => loadRoadNetwork(), [])
+  const [network, setNetwork] = useState<RoadNetwork | null>(null)
   const [snapshot, setSnapshot] = useState<SimSnapshot | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
+
+  useEffect(() => {
+    fetch('http://localhost:8000/network')
+      .then(res => res.json())
+      .then(setNetwork)
+      .catch(err => console.error('Failed to load network', err))
+  }, [])
 
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:8000/ws')
@@ -57,10 +63,12 @@ function App() {
           url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
           attribution='© OpenStreetMap contributors © CARTO'
         />
-        <RoadNetworkLayer
-          network={network}
-          signals={snapshot?.signals ?? []}
-        />
+        {network && (
+          <RoadNetworkLayer
+            network={network}
+            signals={snapshot?.signals ?? []}
+          />
+        )}
         <VehicleLayer vehicles={snapshot?.vehicles ?? []} />
       </MapContainer>
 

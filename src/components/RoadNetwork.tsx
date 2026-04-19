@@ -1,11 +1,32 @@
 import React from 'react'
 import { Polyline, CircleMarker } from 'react-leaflet'
-import { RoadNetwork } from '../simulation/mapLoader'
 import { OneWayDecorator } from './OneWayLayer'
 
 interface SignalData {
   node_id: string
   phase: string
+}
+
+interface MapNode {
+    id: string
+    lat: number
+    lon: number
+    isSignal: boolean
+}
+
+interface Road {
+    id: string
+    name: string
+    coordinates: [number, number][]
+    nodeIds: string[] 
+    oneWay: boolean,
+    maxSpeed: number
+}
+
+export interface RoadNetwork {
+    nodes: MapNode[]
+    roads: Road[]
+    signals: MapNode[]
 }
 
 interface Props {

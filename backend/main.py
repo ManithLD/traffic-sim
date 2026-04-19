@@ -4,8 +4,17 @@ import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from map_loader import load_road_network
 from simulation import Simulation
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), '..', 'src', 'data', 'export.json')
 network = load_road_network(DATA_PATH)
@@ -23,6 +32,40 @@ TODO:
 @app.get("/health")
 def health():
     return {"status": "ok", "signals": len(network.signals)}
+
+@app.get("/network")
+def get_network():
+    return {
+        "nodes": [
+            {
+                "id": n.id,
+                "lat": n.lat,
+                "lon": n.lon,
+                "isSignal": n.is_signal
+            }
+            for n in network.nodes.values()
+        ],
+        "roads": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "coordinates": r.coordinates,
+                "nodeIds": r.node_ids,
+                "oneWay": r.one_way,
+                "maxSpeed": r.max_speed
+            }
+            for r in network.roads
+        ],
+        "signals": [
+            {
+                "id": s.id,
+                "lat": s.lat,
+                "lon": s.lon,
+                "isSignal": s.is_signal
+            }
+            for s in network.signals
+        ]
+    }
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
