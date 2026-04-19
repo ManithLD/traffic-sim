@@ -1,4 +1,4 @@
-# Traffic Sim
+# UrbanFlow Simulation Engine
 
 ## What is this?
 A traffic simulation engine built on real map data from downtown Toronto.
