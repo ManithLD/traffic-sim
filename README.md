@@ -2,7 +2,7 @@
 
 ---
 
-Hello there! This project was based on a shower thought and my curiosity to simulate real time traffic and adding an optimization twist. The goal of this project is not only to improve my own skills in full stack simulation development but also to demonstrate or find a way to optimize a centralized traffic system.
+Hello there! This project was based on a shower thought and my curiosity to simulate real time traffic and adding a traffic light optimization twist. The goal of this project is not only to improve my own skills in full stack simulation development but also to demonstrate or find a way to optimize a centralized traffic system. This will hopefully lead me to create some F1 simulations in the future :)
 
 ---
 
