@@ -1,38 +1,47 @@
-import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer } from 'react-leaflet'
-import { buildAdjacencyList, loadRoadNetwork } from './simulation/mapLoader'
+import { loadRoadNetwork } from './simulation/mapLoader'
 import RoadNetworkLayer from './components/RoadNetwork'
-import { dijkstra, PathResult } from './simulation/pathFinding'
 import VehicleLayer from './components/VehicleLayer'
 
+interface VehicleData {
+  id: string
+  lat: number
+  lon: number
+  state: string
+}
+
+interface SignalData {
+  node_id: string
+  phase: string
+}
+
+interface SimSnapshot {
+  tick: number
+  vehicles: VehicleData[]
+  signals: SignalData[],
+  waiting_count: number
+}
+
 function App() {
-  const network = useMemo(() => loadRoadNetwork(), []);
-  const [path, setPath] = useState<PathResult | null>(null);
-  const adjacency = useMemo(() => buildAdjacencyList(network), [network]);
-  const [approachingSignalId, setApproachingSignalId] = useState<string | null>(null);
-  const [signalStates, setSignalStates] = useState<Record<string, string>>({});
-
-  const startNewPath = useCallback(() => {
-    const connected = network.signals.filter(s => 
-        (adjacency.get(s.id)?.length ?? 0) >= 2
-    )
-    if (connected.length < 2) return
-
-    const startNode = connected[Math.floor(Math.random() * connected.length)]
-    const endNode = connected[Math.floor(Math.random() * connected.length)]
-    if (startNode.id === endNode.id) return
-
-    const result = dijkstra(adjacency, startNode.id, endNode.id)
-    if (result) setPath(result)
-  }, [network, adjacency]);
+  const network = useMemo(() => loadRoadNetwork(), [])
+  const [snapshot, setSnapshot] = useState<SimSnapshot | null>(null)
+  const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
-    startNewPath();
-  }, [startNewPath])
+    const ws = new WebSocket('ws://localhost:8000/ws')
+    wsRef.current = ws
 
-  const updateSignalState = useCallback((id: string, color: string) => {
-    setSignalStates(prev => ({ ...prev, [id]: color }));
-  }, []);
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data) as SimSnapshot
+      setSnapshot(data)
+    }
+
+    ws.onerror = (e) => console.error('WebSocket error', e)
+    ws.onclose = () => console.log('WebSocket closed')
+
+    return () => ws.close()
+  }, [])
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
@@ -48,9 +57,24 @@ function App() {
           url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
           attribution='© OpenStreetMap contributors © CARTO'
         />
-        <VehicleLayer network={network} path={path} startNewPath={startNewPath} onApproachSignal={setApproachingSignalId} signalStates={signalStates} />
-        <RoadNetworkLayer network={network} path={path} approachingSignalId={approachingSignalId} setSignalStates={updateSignalState} />
+        <RoadNetworkLayer
+          network={network}
+          signals={snapshot?.signals ?? []}
+        />
+        <VehicleLayer vehicles={snapshot?.vehicles ?? []} />
       </MapContainer>
+
+      <div style={{
+        position: 'absolute', top: 16, right: 16, zIndex: 1000,
+        background: 'white', padding: '10px 16px', borderRadius: 8,
+        fontSize: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+      }}>
+        <div>Tick: {snapshot?.tick ?? 0}</div>
+        <div>Vehicles: {snapshot?.vehicles.length ?? 0}</div>
+        <div style={{ color: '#9333ea', fontWeight: 'bold' }}>
+          Waiting: {snapshot?.waiting_count ?? 0}
+        </div>
+      </div>
     </div>
   )
 }
