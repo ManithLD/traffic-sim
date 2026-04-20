@@ -19,8 +19,11 @@ interface SignalData {
 interface SimSnapshot {
   tick: number
   vehicles: VehicleData[]
-  signals: SignalData[],
+  signals: SignalData[]
   waiting_count: number
+  signal_mode: string
+  completed_vehicles: number
+  avg_wait_ticks: number
 }
 
 function App() {
@@ -55,6 +58,8 @@ function App() {
     return <SetupScreen onStart={setConfig} />
   }
 
+  const isAdaptive = snapshot?.signal_mode === 'adaptive'
+
   return (
     <div style={{ width: '99vw', height: '98vh' }}>
       <MapContainer
@@ -81,12 +86,23 @@ function App() {
       <div style={{
         position: 'absolute', top: 16, right: 16, zIndex: 1000,
         background: 'white', padding: '10px 16px', borderRadius: 8,
-        fontSize: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+        fontSize: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        minWidth: 180
       }}>
+        <div style={{ fontWeight: 'bold', marginBottom: 6, color: isAdaptive ? '#16a34a' : '#2563eb' }}>
+          {isAdaptive ? 'Adaptive (Max-Pressure)' : 'Fixed Timing'}
+        </div>
         <div>Tick: {snapshot?.tick ?? 0}</div>
         <div>Vehicles: {snapshot?.vehicles.length ?? 0}</div>
         <div style={{ color: '#9333ea', fontWeight: 'bold' }}>
           Waiting: {snapshot?.waiting_count ?? 0}
+        </div>
+        <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 8, paddingTop: 8 }}>
+          <div style={{ color: '#6b7280', fontSize: 11, marginBottom: 4 }}>Completed trips</div>
+          <div>Count: {snapshot?.completed_vehicles ?? 0}</div>
+          <div style={{ fontWeight: 'bold', color: isAdaptive ? '#16a34a' : '#374151' }}>
+            Avg wait: {snapshot?.avg_wait_ticks ?? 0} ticks
+          </div>
         </div>
       </div>
     </div>

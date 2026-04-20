@@ -10,17 +10,26 @@ class SignalState:
     node_id: str
     phase: str
     timer: int
+    peak_upstream: int = 0
 
 GREEN_TICKS = 50
 YELLOW_TICKS = 10
-RED_TICKS = 50
+RED_TICKS = 15
+MIN_RED_TICKS = 5
+MIN_GREEN_TICKS = 50
+MAX_GREEN_TICKS = 90
+PRESSURE_SCALE = 3
+PRESSURE_THRESHOLD = 2
+APPROACHING_THRESHOLD = 3
+MAX_LOOKAHEAD_NODES = 50
 
 def init_signals(signals: list[MapNode]) -> list[SignalState]:
     return [
         SignalState(
             node_id=s.id,
             phase='green',
-            timer=GREEN_TICKS - (i * 7) % GREEN_TICKS
+            timer=GREEN_TICKS - (i * 7) % GREEN_TICKS,
+            peak_upstream=0
         )
         for i, s in enumerate(signals)
     ]
@@ -38,6 +47,55 @@ def update_signals(states: list[SignalState]) -> list[SignalState]:
                 updated.append(SignalState(s.node_id, 'red', RED_TICKS))
             else:
                 updated.append(SignalState(s.node_id, 'green', GREEN_TICKS))
+    return updated
+
+def adaptive_green_ticks(pressure: int) -> int:
+    if pressure <= PRESSURE_THRESHOLD:
+        return MIN_GREEN_TICKS
+    return min(GREEN_TICKS + (pressure - PRESSURE_THRESHOLD) * PRESSURE_SCALE, MAX_GREEN_TICKS)
+
+def build_signal_demand(vehicles: list, signal_ids: set) -> tuple[dict[str, int], dict[str, int]]:
+    upstream_by_node: dict[str, int] = {}
+    approaching_by_node: dict[str, int] = {}
+
+    for v in vehicles:
+        ids = v.path.node_ids
+        sec = v.current_section
+
+        if sec + 1 < len(ids) and v.state == 'waiting':
+            nid = ids[sec + 1]
+            upstream_by_node[nid] = upstream_by_node.get(nid, 0) + 1
+
+        for i in range(1, min(MAX_LOOKAHEAD_NODES, len(ids) - sec)):
+            nid = ids[sec + i]
+            if nid in signal_ids:
+                approaching_by_node[nid] = approaching_by_node.get(nid, 0) + 1
+                break
+
+    return upstream_by_node, approaching_by_node
+
+def update_signals_adaptive(states: list[SignalState], vehicles: list) -> list[SignalState]:
+    signal_ids = {s.node_id for s in states}
+    upstream_by_node, approaching_by_node = build_signal_demand(vehicles, signal_ids)
+
+    updated = []
+    for s in states:
+        new_timer = s.timer - 1
+        if new_timer > 0:
+            new_peak = max(s.peak_upstream, upstream_by_node.get(s.node_id, 0)) if s.phase == 'red' else s.peak_upstream
+            updated.append(SignalState(s.node_id, s.phase, new_timer, new_peak))
+        else:
+            if s.phase == 'green':
+                updated.append(SignalState(s.node_id, 'yellow', YELLOW_TICKS, s.peak_upstream))
+            elif s.phase == 'yellow':
+                approaching = approaching_by_node.get(s.node_id, 0)
+                if approaching < APPROACHING_THRESHOLD:
+                    updated.append(SignalState(s.node_id, 'green', adaptive_green_ticks(s.peak_upstream), 0))
+                else:
+                    red_duration = MIN_RED_TICKS if s.peak_upstream == 0 else RED_TICKS
+                    updated.append(SignalState(s.node_id, 'red', red_duration, 0))
+            else:
+                updated.append(SignalState(s.node_id, 'green', adaptive_green_ticks(s.peak_upstream), 0))
     return updated
 
 
@@ -103,17 +161,20 @@ class SimulationState:
     tick: int = 0
 
 class Simulation:
-    def __init__(self, network: RoadNetwork, spawn_rate: int = 10, max_vehicles: int = 150, speed_multiplier: float = 1.0):
+    def __init__(self, network: RoadNetwork, spawn_rate: int = 10, max_vehicles: int = 150, speed_multiplier: float = 1.0, signal_mode: str = 'fixed'):
         self.network = network
         self.adjacency = build_adjacency(network)
         self.spawn_rate = spawn_rate
         self.max_vehicles = max_vehicles
         self.speed_multiplier = speed_multiplier
+        self.signal_mode = signal_mode
         self.state = SimulationState(signals=init_signals(network.signals))
         self.connected_signals = [
             s for s in network.signals
             if len(self.adjacency.get(s.id, [])) >= 2
         ]
+        self.total_wait_ticks = 0
+        self.completed_vehicles = 0
 
     def spawn_vehicle(self):
         if len(self.connected_signals) < 2:
@@ -154,13 +215,16 @@ class Simulation:
         self.state.vehicles.append(vehicle)
 
     def tick(self):
-        self.state.signals = update_signals(self.state.signals)
+        if self.signal_mode == 'adaptive':
+            self.state.signals = update_signals_adaptive(self.state.signals, self.state.vehicles)
+        else:
+            self.state.signals = update_signals(self.state.signals)
+
         signal_map = {s.node_id: s for s in self.state.signals}
 
         if self.state.tick % self.spawn_rate == 0:
             self.spawn_vehicle()
 
-        # tick vehicles
         updated = []
         for v in self.state.vehicles:
             blocked = is_near_red_signal(v, self.network, signal_map)
@@ -175,6 +239,8 @@ class Simulation:
             if new_progress >= 1.0:
                 next_section = v.current_section + 1
                 if next_section >= len(v.path.node_ids) - 1:
+                    self.total_wait_ticks += v.wait_time
+                    self.completed_vehicles += 1
                     continue
 
                 from_node = self.network.nodes.get(v.path.node_ids[next_section])
@@ -222,9 +288,14 @@ class Simulation:
             for s in self.state.signals
         ]
 
+        avg_wait = round(self.total_wait_ticks / self.completed_vehicles, 2) if self.completed_vehicles > 0 else 0
+
         return {
             'tick': self.state.tick,
             'vehicles': vehicle_data,
             'signals': signal_data,
-            'waiting_count': waiting_count
+            'waiting_count': waiting_count,
+            'signal_mode': self.signal_mode,
+            'completed_vehicles': self.completed_vehicles,
+            'avg_wait_ticks': avg_wait,
         }

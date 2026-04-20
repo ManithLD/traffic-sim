@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+from pathfinding import build_adjacency
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from map_loader import load_road_network
 from simulation import Simulation
@@ -25,6 +26,7 @@ class SimConfig(BaseModel):
     spawn_rate: int = 10
     max_vehicles: int = 150
     speed_multiplier: float = 1.0
+    signal_mode: str = 'fixed'
 
 """
 TODO:
@@ -37,12 +39,14 @@ TODO:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "signals": len(network.signals)}
+    adjacency = build_adjacency(network)
+    connected = [s for s in network.signals if len(adjacency.get(s.id, [])) >= 2]
+    return {"status": "ok", "signals": len(network.signals), "connected_signals": len(connected)}
 
 @app.post("/start")
 def start_sim(config: SimConfig):
     global sim
-    sim = Simulation(network, spawn_rate=config.spawn_rate, max_vehicles=config.max_vehicles, speed_multiplier=config.speed_multiplier)
+    sim = Simulation(network, spawn_rate=config.spawn_rate, max_vehicles=config.max_vehicles, speed_multiplier=config.speed_multiplier, signal_mode=config.signal_mode)
     return {"status": "started"}
 
 @app.get("/network")

@@ -4,12 +4,14 @@ export interface SimConfig {
   spawn_rate: number
   max_vehicles: number
   speed_multiplier: number
+  signal_mode: string
 }
 
 export function SetupScreen({ onStart }: { onStart: (cfg: SimConfig) => void }) {
   const [spawnRate, setSpawnRate] = useState(10)
   const [maxVehicles, setMaxVehicles] = useState(150)
   const [speedMultiplier, setSpeedMultiplier] = useState(1.0)
+  const [signalMode, setSignalMode] = useState<'fixed' | 'adaptive'>('fixed')
   const [loading, setLoading] = useState(false)
 
   const handleStart = async () => {
@@ -18,9 +20,9 @@ export function SetupScreen({ onStart }: { onStart: (cfg: SimConfig) => void }) 
       await fetch('http://localhost:8000/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spawn_rate: spawnRate, max_vehicles: maxVehicles, speed_multiplier: speedMultiplier }),
+        body: JSON.stringify({ spawn_rate: spawnRate, max_vehicles: maxVehicles, speed_multiplier: speedMultiplier, signal_mode: signalMode }),
       })
-      onStart({ spawn_rate: spawnRate, max_vehicles: maxVehicles, speed_multiplier: speedMultiplier })
+      onStart({ spawn_rate: spawnRate, max_vehicles: maxVehicles, speed_multiplier: speedMultiplier, signal_mode: signalMode })
     } catch (err) {
       console.error('Failed to start simulation', err)
       setLoading(false)
@@ -60,6 +62,31 @@ export function SetupScreen({ onStart }: { onStart: (cfg: SimConfig) => void }) 
           format={v => `${v.toFixed(1)}×`}
           onChange={setSpeedMultiplier}
         />
+
+        <div style={{ marginBottom: '1.25rem' }}>
+          <label style={{ fontSize: 13, color: '#666', display: 'block', marginBottom: 8 }}>Signal mode</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(['fixed', 'adaptive'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setSignalMode(mode)}
+                style={{
+                  flex: 1, padding: '8px 0', fontSize: 13, fontWeight: 500,
+                  border: '1.5px solid',
+                  borderColor: signalMode === mode ? (mode === 'adaptive' ? '#16a34a' : '#2563eb') : '#e5e7eb',
+                  borderRadius: 8, cursor: 'pointer',
+                  background: signalMode === mode ? (mode === 'adaptive' ? '#f0fdf4' : '#eff6ff') : 'white',
+                  color: signalMode === mode ? (mode === 'adaptive' ? '#16a34a' : '#2563eb') : '#888',
+                }}
+              >
+                {mode === 'fixed' ? 'Fixed' : 'Adaptive'}
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: 11, color: '#aaa', margin: '6px 0 0' }}>
+            {signalMode === 'adaptive' ? 'Max-Pressure: green duration adjusts to queue length' : 'Fixed 50-tick green/red cycle'}
+          </p>
+        </div>
 
         <div style={{ borderTop: '1px solid #eee', paddingTop: '1.25rem' }}>
           <button
