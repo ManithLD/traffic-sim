@@ -103,15 +103,16 @@ class SimulationState:
     tick: int = 0
 
 class Simulation:
-    def __init__(self, network: RoadNetwork):
+    def __init__(self, network: RoadNetwork, spawn_rate: int = 10, max_vehicles: int = 150, speed_multiplier: float = 1.0):
         self.network = network
         self.adjacency = build_adjacency(network)
-        self.state = SimulationState(
-            signals=init_signals(network.signals)
-        )
+        self.spawn_rate = spawn_rate
+        self.max_vehicles = max_vehicles
+        self.speed_multiplier = speed_multiplier
+        self.state = SimulationState(signals=init_signals(network.signals))
         self.connected_signals = [
             s for s in network.signals
-            if len(self.adjacency.get(s.id, [])) >= 2  # to find only valid routes!
+            if len(self.adjacency.get(s.id, [])) >= 2
         ]
 
     def spawn_vehicle(self):
@@ -138,7 +139,7 @@ class Simulation:
         )
         edges = self.adjacency.get(from_node.id, [])
         max_speed = edges[0]['max_speed'] if edges else 50
-        speed_ms = (max_speed + random.uniform(-15, 15)) # / 3.6 (for testing)
+        speed_ms = ((max_speed + random.uniform(-15, 15)) / 3.6) * self.speed_multiplier
         progress_per_tick = (speed_ms * 0.1) / max(section_len, 1)
 
         vehicle = Vehicle(
@@ -156,8 +157,7 @@ class Simulation:
         self.state.signals = update_signals(self.state.signals)
         signal_map = {s.node_id: s for s in self.state.signals}
 
-        # TODO: custom spawn rate or insant spawn of X vehicles
-        if self.state.tick % 10 == 0:
+        if self.state.tick % self.spawn_rate == 0:
             self.spawn_vehicle()
 
         # tick vehicles
@@ -189,7 +189,7 @@ class Simulation:
                     road_id = v.path.road_ids[next_section] if next_section < len(v.path.road_ids) else None
                     edge = next((e for e in edges if e['road_id'] == road_id), edges[0] if edges else None)
                     max_speed = edge['max_speed'] if edge else 50
-                    speed_ms = (max_speed + random.uniform(-15, 15)) # / 3.6 (for testing)
+                    speed_ms = ((max_speed + random.uniform(-15, 15)) / 3.6) * self.speed_multiplier
                     v.speed = (speed_ms * 0.1) / max(section_len, 1)
 
                 v.current_section = next_section
@@ -201,8 +201,7 @@ class Simulation:
 
             updated.append(v)
 
-        # cap at 150 vehicles or TODO: custom cap selected by user?
-        self.state.vehicles = updated[-150:]
+        self.state.vehicles = updated[-self.max_vehicles:]
         self.state.tick += 1
 
     def get_snapshot(self) -> dict:

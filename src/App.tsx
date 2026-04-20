@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import RoadNetworkLayer, { RoadNetwork } from './components/RoadNetwork'
 import VehicleLayer from './components/VehicleLayer'
+import { SetupScreen, SimConfig } from './components/StartScreen'
 
 interface VehicleData {
   id: string
@@ -23,6 +24,7 @@ interface SimSnapshot {
 }
 
 function App() {
+  const [config, setConfig] = useState<SimConfig | null>(null)
   const [network, setNetwork] = useState<RoadNetwork | null>(null)
   const [snapshot, setSnapshot] = useState<SimSnapshot | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
@@ -47,10 +49,14 @@ function App() {
     ws.onclose = () => console.log('WebSocket closed')
 
     return () => ws.close()
-  }, [])
+  }, [config])
+
+  if (!config) {
+    return <SetupScreen onStart={setConfig} />
+  }
 
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
+    <div style={{ width: '99vw', height: '98vh' }}>
       <MapContainer
         center={[43.6490, -79.3830]}
         zoom={15}

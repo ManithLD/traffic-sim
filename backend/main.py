@@ -5,6 +5,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from map_loader import load_road_network
 from simulation import Simulation
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -18,7 +19,12 @@ app.add_middleware(
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), '..', 'src', 'data', 'export.json')
 network = load_road_network(DATA_PATH)
-sim = Simulation(network)
+sim: Simulation | None = None
+
+class SimConfig(BaseModel):
+    spawn_rate: int = 10
+    max_vehicles: int = 150
+    speed_multiplier: float = 1.0
 
 """
 TODO:
@@ -32,6 +38,12 @@ TODO:
 @app.get("/health")
 def health():
     return {"status": "ok", "signals": len(network.signals)}
+
+@app.post("/start")
+def start_sim(config: SimConfig):
+    global sim
+    sim = Simulation(network, spawn_rate=config.spawn_rate, max_vehicles=config.max_vehicles, speed_multiplier=config.speed_multiplier)
+    return {"status": "started"}
 
 @app.get("/network")
 def get_network():
@@ -72,6 +84,9 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
+            if sim is None:
+                await asyncio.sleep(0.1)
+                continue
             sim.tick()
             snapshot = sim.get_snapshot()
             await websocket.send_text(json.dumps(snapshot))
