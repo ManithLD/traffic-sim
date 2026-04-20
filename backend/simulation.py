@@ -136,8 +136,9 @@ class Simulation:
             from_node.lat, from_node.lon,
             to_node.lat, to_node.lon
         )
-        # TODO: pick a random speed based on max speed of the road segment +- 10kmh? 15kmh?
-        speed_ms = 40 # / 3.6 (amplified speed for testing)
+        edges = self.adjacency.get(from_node.id, [])
+        max_speed = edges[0]['max_speed'] if edges else 50
+        speed_ms = (max_speed + random.uniform(-15, 15)) # / 3.6 (for testing)
         progress_per_tick = (speed_ms * 0.1) / max(section_len, 1)
 
         vehicle = Vehicle(
@@ -183,7 +184,12 @@ class Simulation:
                         from_node.lat, from_node.lon,
                         to_node.lat, to_node.lon
                     )
-                    speed_ms = 40 # / 3.6 (amplified speed for testing)
+                    next_from_id = v.path.node_ids[next_section]
+                    edges = self.adjacency.get(next_from_id, [])
+                    road_id = v.path.road_ids[next_section] if next_section < len(v.path.road_ids) else None
+                    edge = next((e for e in edges if e['road_id'] == road_id), edges[0] if edges else None)
+                    max_speed = edge['max_speed'] if edge else 50
+                    speed_ms = (max_speed + random.uniform(-15, 15)) # / 3.6 (for testing)
                     v.speed = (speed_ms * 0.1) / max(section_len, 1)
 
                 v.current_section = next_section

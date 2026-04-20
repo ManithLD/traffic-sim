@@ -35,7 +35,8 @@ def build_adjacency(network: RoadNetwork) -> dict[str, list[dict]]:
             adjacency[from_id].append({
                 'node_id': to_id,
                 'road_id': road.id,
-                'cost': cost
+                'cost': cost,
+                'max_speed': road.max_speed
             })
 
             if not road.one_way:
@@ -44,7 +45,8 @@ def build_adjacency(network: RoadNetwork) -> dict[str, list[dict]]:
                 adjacency[to_id].append({
                     'node_id': from_id,
                     'road_id': road.id,
-                    'cost': cost
+                    'cost': cost,
+                    'max_speed': road.max_speed
                 })
 
     return adjacency
