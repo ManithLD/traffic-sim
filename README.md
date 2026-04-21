@@ -7,6 +7,10 @@ Hello there! This project was based on a shower thought and my curiosity to simu
 ---
 
 ## What is this?
+<div style="display: flex; gap: 10px; flex-wrap: nowrap;">
+  <img width="180" src="https://github.com/user-attachments/assets/48c896cb-6cab-42f0-95a0-8641c414c26c" />
+  <img width="180" src="https://github.com/user-attachments/assets/81016f5b-b9b7-46ce-bde5-43ca3b73d562" />
+</div>
 
 Traffic simulation engine built on real road data from downtown Toronto (for now... will add the ability to import custom maps later).
 It models how vehicles move through a road network, where users can:
