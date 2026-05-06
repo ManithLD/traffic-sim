@@ -108,6 +108,7 @@ class Vehicle:
     speed: float
     state: str
     wait_time: int
+    priority: bool
 
 def distance_metres(lat1, lon1, lat2, lon2):
     dlat = (lat2 - lat1) * 111000
@@ -210,7 +211,8 @@ class Simulation:
             progress=0.0,
             speed=progress_per_tick,
             state='moving',
-            wait_time=0
+            wait_time=0,
+            priority=random.random() < 0.1
         )
         self.state.vehicles.append(vehicle)
 
@@ -280,7 +282,8 @@ class Simulation:
                     'id': v.id,
                     'lat': pos[0],
                     'lon': pos[1],
-                    'state': v.state
+                    'state': v.state,
+                    'priority': v.priority
                 })
 
         signal_data = [

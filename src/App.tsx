@@ -1,15 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import RoadNetworkLayer, { RoadNetwork } from './components/RoadNetwork'
-import VehicleLayer from './components/VehicleLayer'
+import VehicleLayer, { VehicleData } from './components/VehicleLayer'
 import { SetupScreen, SimConfig } from './components/StartScreen'
-
-interface VehicleData {
-  id: string
-  lat: number
-  lon: number
-  state: string
-}
 
 interface SignalData {
   node_id: string

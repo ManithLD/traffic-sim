@@ -1,10 +1,11 @@
 import { CircleMarker } from 'react-leaflet'
 
-interface VehicleData {
+export interface VehicleData {
   id: string
   lat: number
   lon: number
   state: string
+  priority: boolean
 }
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function VehicleLayer({ vehicles }: Props) {
+  console.log(vehicles[0]?.priority)
   return (
     <>
       {vehicles.map(v => (
@@ -19,8 +21,8 @@ export default function VehicleLayer({ vehicles }: Props) {
           key={`${v.id}-${v.state}`}
           center={[v.lat, v.lon]}
           radius={4}
-          color={v.state === 'waiting' ? '#9333ea' : '#3b82f6'}
-          fillColor={v.state === 'waiting' ? '#9333ea' : '#3b82f6'}
+          color={v.priority ? '#ff00d4' : v.state === 'waiting' ? '#9333ea' : '#3b82f6'}
+          fillColor={v.priority ? '#ff00d4' : v.state === 'waiting' ? '#9333ea' : '#3b82f6'}
           fillOpacity={1}
         />
       ))}
